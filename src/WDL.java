@@ -108,7 +108,7 @@ public class WDL
     public static void preStart( )
     {
     	String isPrivateServer = mc.getServerData().serverMOTD;
-    	if (!isPrivateServer.contains("§-") || !isPrivateServer.contains("\u00A7-") || !isPrivateServer.contains("\u00a7-"))
+    	if (!isPrivateServer.contains("\u00A7-") || !isPrivateServer.contains("\u00a7-"))
     	{
     		WDL.start();
     	} else {
