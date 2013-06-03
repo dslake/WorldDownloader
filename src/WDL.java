@@ -32,43 +32,43 @@ public class WDL
     public static INetworkManager nm = null; // Reference to a connection specific object. Used to detect a new connection.
     public static EntityClientPlayerMP tp;
     public static McoServer mcos;
-    
+
     public static Container windowContainer; // Reference to the place where all the item stacks end up after receiving them.
     public static int lastX = 0, lastY = 0, lastZ = 0; // Last right clicked block. Needed for TileEntity creation!
     public static Entity lastEntity; // Last entity clicked (used for non-block tiles like minecarts with chests)
-    
+
     public static SaveHandler  saveHandler; // For player files and the level.dat file
     public static IChunkLoader chunkLoader; // For the chunks (despite it's name it does also SAVE them)
-    
+
     // Positions of newly created TileEntities that will overwrite the imported ones when saving:
     public static HashSet<ChunkPosition> newTileEntities = new HashSet<ChunkPosition>();
-    
+
     public static GuiScreen guiToShowAsync = null; // A Gui to show in the next world tick. Needed so that the mouse works.
-    
+
     // State variables:
     public static boolean downloading   = false; // Read-only outside of this class!
     public static boolean isMultiworld  = false; // Is this a multiworld server?
     public static boolean propsFound    = false; // Are there saved properties available?
     public static boolean startOnChange = false; // Automatically restart after world changes?
-    
+
     public static boolean saving = false;
     public static boolean worldLoadingDeferred = false;
-    
+
     // Names:
     public static String worldName      = "WorldDownloaderERROR"; // safe default
 	public static String baseFolderName = "WorldDownloaderERROR"; // safe default
-    
+
 	// Properties:
     public static Properties baseProps;
     public static Properties worldProps;
     public static Properties defaultProps;
-	
+
     // Initialization:
     static
     {
         // Get the static Minecraft reference:
         mc = (Minecraft) stealAndGetField( Minecraft.class, Minecraft.class );
-        
+
         // Initialize the Properties template:
         defaultProps = new Properties();
         defaultProps.setProperty("ServerName", "");
@@ -96,14 +96,28 @@ public class WDL
         defaultProps.setProperty("PlayerZ", "8");
         defaultProps.setProperty("PlayerHealth", "20");
         defaultProps.setProperty("PlayerFood", "20");
-        
+
         baseProps = new Properties(defaultProps);
         worldProps = new Properties(baseProps);
     }
-    
-    
+
+
     //// Methods to control World Downloader \\\\
-    
+
+    /** Check server before starting download **/
+    public static void preStart( )
+    {
+    	String isPrivateServer = mc.getServerData().serverMOTD;
+    	if (!isPrivateServer.contains("\u00A7-") || !isPrivateServer.contains("\u00a7-"))
+    	{
+    		WDL.start();
+    	} else {
+    		startOnChange = false;
+    		downloading = false;
+    		chatMsg( "You are not allowed to download this world." );
+    	}
+    }
+
     /** Starts the download */
     public static void start( )
     {
@@ -114,29 +128,28 @@ public class WDL
             guiToShowAsync = new GuiWDLMultiworldSelect( null );
             return;
         }
-        
+
         if( ! propsFound )
         {
             // Never seen this world before. Ask user about multiworlds:
             guiToShowAsync = new GuiWDLMultiworld( null );
             return;
         }
-        
+
         worldProps = loadWorldProps( worldName );
-        
+
         saveHandler = (SaveHandler) mc.getSaveLoader().getSaveLoader( getWorldFolderName(worldName), true );
         chunkLoader = saveHandler.getChunkLoader( wc.provider );
-        
+
         newTileEntities = new HashSet<ChunkPosition>();
-        
         if( baseProps.getProperty( "ServerName" ).isEmpty() )
             baseProps.setProperty( "ServerName", getServerName() );
-        
+
         startOnChange = true;
         downloading = true;
         chatMsg( "Download started" );
     }
-    
+
     /** Stops the download */
     public static void stop( )
     {
@@ -146,11 +159,11 @@ public class WDL
     		downloading = false;
     		startOnChange = false;
 	    	chatMsg( "Download stopped" );
-	    	
+
 	    	startSaveThread();
     	}
     }
-    
+
     private static void startSaveThread()
     {
     	// Indicate that we are saving
@@ -160,15 +173,15 @@ public class WDL
     	Thread thread = new Thread(saver, "WDL Save Thread");
     	thread.start();    	
     }
-    
+
     //// Callback methods for important events. Call them from suitable locations in the base classes. \\\\
-    
+
     /** Must be called after the static World object in Minecraft has been replaced */
     public static void onWorldLoad( )
     {
         if( mc.isIntegratedServerRunning() )
             return;
-        
+
         // If already downloading
         if( downloading )
         {
@@ -183,17 +196,17 @@ public class WDL
         }
         loadWorld();
     }
-    
+
     public static void loadWorld()
     {   
         worldName = ""; // The new (multi-)world name is unknown at the moment
         wc = mc.theWorld;
         tp = mc.thePlayer;
         windowContainer = tp.openContainer;
-        
+
         // Is this a different server?
         INetworkManager newNM = tp.sendQueue.getNetManager();
-        
+
         if( nm != newNM )
         {
             // Different server, different world!
@@ -213,18 +226,18 @@ public class WDL
                 start();
         }
     }
-    
+
     /** Must be called when the world is no longer used */
     public static void onWorldUnload( )
     {
     }
-    
+
     public static void onSaveComplete()
     {
     	WDL.mc.getSaveLoader().flushCache();
 	    WDL.saveHandler.flush();
 	    WDL.wc = null;
-	    
+
 	    // If still downloading, load the current world and keep on downloading 
 	    if(downloading)
 	    {
@@ -232,27 +245,27 @@ public class WDL
 	    	WDL.loadWorld();
 	    	return;
 	    }
-	    
+
 	    WDL.chatMsg( "Save complete. Your single player file is ready to play!" );
     }
-    
-    
+
+
     /** Must be called when a chunk is no longer needed and should be removed */
     public static void onChunkNoLongerNeeded( Chunk unneededChunk )
     {
         if( unneededChunk == null || unneededChunk.isModified == false )
             return;
-        
+
         chatDebug( "onChunkNoLongerNeeded: " + unneededChunk.xPosition + ", " + unneededChunk.zPosition );
         saveChunk( unneededChunk );
     }
-    
+
     /** Must be called when a GUI that receives item stacks from the server is shown */
     public static void onItemGuiOpened( )
     {
         if( mc.objectMouseOver == null )
             return;
-        
+
         if( mc.objectMouseOver.typeOfHit == EnumMovingObjectType.ENTITY)
         {
         	lastEntity = mc.objectMouseOver.entityHit;
@@ -265,16 +278,16 @@ public class WDL
 	        lastZ = mc.objectMouseOver.blockZ;
         }
     }
-    
+
     /** Must be called when a GUI that triggered an onItemGuiOpened is no longer shown */
     public static void onItemGuiClosed( )
     {
     	String saveName = "";
-    	
+
     	// If the last thing clicked was an ENTITY
     	if(lastEntity != null)
     	{
-    		
+
     		if(lastEntity instanceof EntityMinecart && windowContainer instanceof ContainerChest)
     		{
     			EntityMinecart emc = (EntityMinecart)lastEntity;
@@ -302,7 +315,7 @@ public class WDL
     		WDL.chatDebug("Saved " + saveName + ".");
     		return;
     	}
-    	
+
     	// Else, the last thing clicked was a TILE ENTITY
     	// Get the tile entity which we are going to update the inventory for 
         TileEntity te = wc.getBlockTileEntity(lastX, lastY, lastZ);
@@ -311,7 +324,7 @@ public class WDL
         	WDL.chatDebug("onItemGuiClosed could not get TE at " + lastX + " " + lastY + " " + lastZ);
         	return;
         }
-        
+
         if( windowContainer instanceof ContainerChest && te instanceof TileEntityChest)
         {
         	if(windowContainer.inventorySlots.size() > 63 )
@@ -349,8 +362,8 @@ public class WDL
         			WDL.chatMsg("Could not save this chest!");
         			return;
         		}
-        		copyItemStacks( windowContainer, (TileEntityChest)tec1, 0 );
-                copyItemStacks( windowContainer, (TileEntityChest)tec2, 27);
+        		copyItemStacks( windowContainer, tec1, 0 );
+                copyItemStacks( windowContainer, tec2, 27);
                 newTileEntities.add(cp1);
                 newTileEntities.add(cp2);
                 saveName = "Double Chest contents";
@@ -401,7 +414,7 @@ public class WDL
         WDL.chatDebug("Saved " + saveName + ".");
         return;
     }
-    
+
      /**
      * Must be called when a block event is scheduled for the next tick.
      * The caller has to check if WDL.downloading is true!
@@ -418,10 +431,10 @@ public class WDL
         }
         // Pistons, Chests (open, close), EnderChests, ... (see references to WorldServer.addBlockEvent)
     }
-    
-    
+
+
     //// Importing and exporting methods \\\\
-    
+
     /** Load the previously saved TileEntities and add them to the Chunk **/
     public static void importTileEntities( Chunk chunk )
     {
@@ -458,7 +471,7 @@ public class WDL
         }
         catch ( Exception e ) { } // Couldn't load the old chunk. Nothing unusual. Happens with every not downloaded chunk.
     }
-    
+
     /** Checks if the TileEntity should be imported. Only "problematic" TEs will be imported. */
     public static String isImportableTileEntity( TileEntity te )
     {
@@ -476,12 +489,12 @@ public class WDL
         else
             return null;
     }
-    
+
     /** Saves all remaining chunks, world info and player info. Usually called when stopping. */
     public static void saveEverything( )
     {
         saveProps();
-        
+
         try
         {
             saveHandler.checkSessionLock();
@@ -490,20 +503,20 @@ public class WDL
         {
             throw new RuntimeException( "WorldDownloader: Couldn't get session lock for saving the world!" );
         }
-        
+
         NBTTagCompound playerNBT = new NBTTagCompound();
         tp.writeToNBT( playerNBT );
         applyOverridesToPlayer( playerNBT );
-        
+
         wc.worldInfo.setSaveVersion( ((AnvilSaveConverter)mc.getSaveLoader()).getSaveVersion() );
         NBTTagCompound worldInfoNBT = wc.worldInfo.cloneNBTCompound( playerNBT );
         applyOverridesToWorldInfo( worldInfoNBT );
-        
+
         savePlayer( playerNBT );
         saveWorldInfo( worldInfoNBT );
         saveChunks();
     }
-    
+
     /** Save the player (position, health, inventory, ...) into its own file in the players directory */
     public static void savePlayer( NBTTagCompound playerNBT )
     {
@@ -513,7 +526,7 @@ public class WDL
             File playersDirectory = new File( saveHandler.getWorldDirectory(), "players" );
             File playerFile = new File( playersDirectory, tp.username + ".dat.tmp" );
             File playerFileOld = new File( playersDirectory, tp.username + ".dat" );
-            
+
             CompressedStreamTools.writeCompressed( playerNBT, new FileOutputStream( playerFile ) );
 
             if( playerFileOld.exists() )
@@ -526,7 +539,7 @@ public class WDL
         }
         chatDebug( "Player data saved.");
     }
-    
+
     /** Save the world metadata (time, gamemode, seed, ...) into the level.dat file */
     public static void saveWorldInfo( NBTTagCompound worldInfoNBT )
     {
@@ -534,21 +547,21 @@ public class WDL
         File saveDirectory = saveHandler.getWorldDirectory();
         NBTTagCompound dataNBT = new NBTTagCompound();
         dataNBT.setTag( "Data", worldInfoNBT );
-        
+
         try
         {
             File dataFile = new File( saveDirectory, "level.dat_new" );
             File dataFileBackup = new File( saveDirectory, "level.dat_old" );
             File dataFileOld = new File( saveDirectory, "level.dat" );
             CompressedStreamTools.writeCompressed( dataNBT, new FileOutputStream( dataFile ) );
-            
+
             if( dataFileBackup.exists() )
                 dataFileBackup.delete();
-            
+
             dataFileOld.renameTo( dataFileBackup );
             if( dataFileOld.exists() )
                 dataFileOld.delete();
-            
+
             dataFile.renameTo( dataFileOld );
             if( dataFile.exists() )
                 dataFile.delete();
@@ -559,17 +572,17 @@ public class WDL
         }
         chatDebug( "World data saved.");
     }
-    
+
     /** Calls saveChunk for all currently loaded chunks */
     public static void saveChunks( )
     {
     	chatDebug( "Saving chunks...");
         LongHashMap chunkMapping = (LongHashMap) stealAndGetField( wc.chunkProvider, LongHashMap.class );
         LongHashMapEntry[] hashArray = (LongHashMapEntry[]) stealAndGetField( chunkMapping , LongHashMapEntry[].class );
-        
+
         WDLSaveProgressReporter progressReporter = new WDLSaveProgressReporter();
         progressReporter.start();
-        
+
         // Now that we have the HashMap, lets start iterating over it:
         for( LongHashMapEntry lhme : hashArray )
         {
@@ -579,7 +592,7 @@ public class WDL
                 if( c != null && c.isModified ) // only save filled chunks
                 {
                     saveChunk( c );
-                    
+
                     try
                     {
                     	ThreadedFileIOBase.threadedIOInstance.waitForFinish();
@@ -591,13 +604,13 @@ public class WDL
                 }
                 else
                     chatMsg( "Didn't save chunk " + c.xPosition + " " + c.zPosition + " because isModified is false!" );
-                
+
                 lhme = lhme.nextEntry; // Get next Entry in this linked list
             }
         }
         chatDebug( "Chunk data saved.");
     }
-    
+
     /**
      * Renders World Downloader save progress bar
      */
@@ -622,7 +635,7 @@ public class WDL
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, mc.renderEngine.getTexture("/gui/icons.png"));
     }
     */
-    
+
     /** Import all not overwritten TileEntities, then save the chunk */
     public static void saveChunk( Chunk c )
     {
@@ -639,10 +652,10 @@ public class WDL
             chatMsg( "Chunk at chunk position " + c.xPosition + "," + c.zPosition + " can't be saved!" );
         }
     }
-    
-    
+
+
     //// Properties related methods \\\\
-    
+
     /** Loads the server specific set of properties */
     public static void loadBaseProps( )
     {
@@ -659,7 +672,7 @@ public class WDL
         }
         catch( Exception e )
         { }
-        
+
         if( baseProps.getProperty("LinkedWorlds").isEmpty() )
         {
             isMultiworld = false;
@@ -668,7 +681,7 @@ public class WDL
         else
             isMultiworld = true;
     }
-    
+
     /** Loads the world specific set of properties */
     public static Properties loadWorldProps( String theWorldName )
     {
@@ -676,7 +689,7 @@ public class WDL
         if( ! theWorldName.isEmpty() )
         {
             String folder = getWorldFolderName( theWorldName );
-        
+
             try { ret.load( new FileReader( new File( mc.mcDataDir, "saves/" + folder + "/WorldDownloader.txt" ) ) ); }
             catch ( Exception e )
             {
@@ -685,13 +698,13 @@ public class WDL
         }
         return ret;
     }
-    
+
     /** Saves the currently used base and world properties in the corresponding folders */
     public static void saveProps( )
     {
         saveProps( worldName, worldProps );
     }
-    
+
     /** Saves the specified world properties and the base properties in the corresponding folders */
     public static void saveProps( String theWorldName, Properties theWorldProps )
     {
@@ -709,7 +722,7 @@ public class WDL
         {
             baseProps.putAll( theWorldProps );
         }
-        
+
         File baseFolder = new File( mc.mcDataDir, "saves/" + baseFolderName );
         baseFolder.mkdirs();
         try
@@ -719,7 +732,7 @@ public class WDL
         catch (Exception e)
         { }
     }
-    
+
     /** Change player specific fields according to the overrides found in the properties file */
     public static void applyOverridesToPlayer( NBTTagCompound playerNBT )
     {
@@ -730,7 +743,7 @@ public class WDL
             short h = Short.parseShort(health);
             playerNBT.setShort("Health", h);
         }
-        
+
         //foodLevel, foodTimer, foodSaturationLevel, foodExhaustionLevel
         String food = worldProps.getProperty("PlayerFood");
         if( !food.equals("keep") )
@@ -744,7 +757,7 @@ public class WDL
                 playerNBT.setFloat("foodSaturationLevel", 0.0f);
             playerNBT.setFloat("foodExhaustionLevel", 0.0f);
         }
-        
+
         //Player Position
         String playerPos = worldProps.getProperty("PlayerPos");
         if( playerPos.equals("xyz") )
@@ -756,18 +769,18 @@ public class WDL
             ((NBTTagDouble)pos.tagAt(0)).data = x + 0.5;
             ((NBTTagDouble)pos.tagAt(1)).data = (double)y + 0.621; //Player height
             ((NBTTagDouble)pos.tagAt(2)).data = z + 0.5;
-            
+
             NBTTagList motion = playerNBT.getTagList("Motion");
             ((NBTTagDouble)motion.tagAt(0)).data = 0.0;
             ((NBTTagDouble)motion.tagAt(1)).data = -0.001; //Needed to land on the ground
             ((NBTTagDouble)motion.tagAt(2)).data = 0.0;
-            
+
             NBTTagList rotation = playerNBT.getTagList("Rotation");
             ((NBTTagFloat)rotation.tagAt(0)).data = 0.0f;
             ((NBTTagFloat)rotation.tagAt(1)).data = 0.0f;
         }
     }
-    
+
     /** Change world and generator specific fields according to the overrides found in the properties file */
     public static void applyOverridesToWorldInfo( NBTTagCompound worldInfoNBT )
     {
@@ -778,7 +791,7 @@ public class WDL
             worldInfoNBT.setString("LevelName", baseName);
         else
             worldInfoNBT.setString("LevelName", baseName + " - " + worldName);
-        
+
         // GameType
         String gametypeOption = worldProps.getProperty("GameType");
         if( gametypeOption.equals("keep") )
@@ -797,7 +810,7 @@ public class WDL
             worldInfoNBT.setInteger("GameType", 0);
             worldInfoNBT.setBoolean("hardcore", true);
         }
-        
+
         //Time
         String timeOption = worldProps.getProperty("Time");
         if( !timeOption.equals("keep") )
@@ -805,7 +818,7 @@ public class WDL
             long t = Integer.parseInt(timeOption);
             worldInfoNBT.setLong("Time", t);
         }
-        
+
         //RandomSeed
         String randomSeed = worldProps.getProperty("RandomSeed");
         long seed = 0;
@@ -821,19 +834,19 @@ public class WDL
             }
         }
         worldInfoNBT.setLong("RandomSeed", seed);
-        
+
         //MapFeatures
         boolean mapFeatures = Boolean.parseBoolean( worldProps.getProperty("MapFeatures") );
         worldInfoNBT.setBoolean("MapFeatures", mapFeatures);
-        
+
         //generatorName
         String generatorName = worldProps.getProperty("GeneratorName");
         worldInfoNBT.setString("generatorName", generatorName);
-        
+
         //generatorVersion
         int generatorVersion = Integer.parseInt( worldProps.getProperty("GeneratorVersion") );
         worldInfoNBT.setInteger("generatorVersion", generatorVersion );
-        
+
         //Weather
         String weather = worldProps.getProperty("Weather");
         if( weather.equals("sunny") )
@@ -857,7 +870,7 @@ public class WDL
             worldInfoNBT.setBoolean("thundering", true);
             worldInfoNBT.setInteger("thunderTime", 24000);
         }
-        
+
         //Spawn
         String spawn = worldProps.getProperty("Spawn");
         if( spawn.equals("player") )
@@ -881,10 +894,10 @@ public class WDL
             worldInfoNBT.setBoolean("initialized", true);
         }
     }
-    
-    
+
+
     //// Helper methods \\\\
-    
+
     /** Get the name of the server the user specified it in the server list */
     public static String getServerName( )
     {
@@ -899,13 +912,13 @@ public class WDL
     	{}
     	return "Unidentified Server";
     }
-    
+
     /** Get the base folder name for the server we are connected to */
     public static String getBaseFolderName( )
     {
     	return getServerName().replaceAll("\\W+", "_");
     }
-    
+
     /** Get the folder name for the specified world */
     public static String getWorldFolderName( String theWorldName )
     {
@@ -914,14 +927,14 @@ public class WDL
         else
             return baseFolderName + " - " + theWorldName;
     }
-    
+
     public static void copyItemStacks( Container c, IInventory i, int startInContainerAt )
     {
         int containerSize = c.inventorySlots.size();
         int inventorySize = i.getSizeInventory();
         int nc = startInContainerAt;
         int ni = 0;
-        
+
         while( (nc < containerSize) && (ni < inventorySize) )
         {
             ItemStack is = c.getSlot( nc ).getStack();
@@ -930,14 +943,14 @@ public class WDL
             nc++;
         }
     }
-    
+
     /** Adds a chat message with a World Downloader prefix */
     public static void chatMsg( String msg )
     {
         //System.out.println( "WorldDownloader: " + msg ); // Just for debugging!
         mc.ingameGUI.getChatGUI().printChatMessage("\u00A7c[WorldDL]\u00A76 " + msg );
     }
-    
+
     /** Adds a chat message with a World Downloader prefix */
     public static void chatDebug( String msg )
     {
@@ -946,7 +959,7 @@ public class WDL
         //System.out.println( "WorldDownloader: " + msg ); // Just for debugging!
         mc.ingameGUI.getChatGUI().printChatMessage("\u00A72[WorldDL]\u00A76 " + msg );
     }
-    
+
     /**
      * Uses Java's reflection API to get access to an unaccessible field
      * @param typeOfClass Class that the field should be read from
@@ -973,7 +986,6 @@ public class WDL
         }
         throw new RuntimeException("WorldDownloader: Couldn't steal Field of type \"" + typeOfField + "\" from class \"" + typeOfClass + "\" !" );
     }
-    
     /**
      * Uses Java's reflection API to get access to an unaccessible field
      * @param object Object that the field should be read from or the type of the object if the field is static
@@ -983,7 +995,7 @@ public class WDL
     public static Object stealAndGetField( Object object, Class typeOfField )
     {
         Class typeOfObject;
-        
+
         if( object instanceof Class ) // User asked for static field:
         {
             typeOfObject = (Class) object;
@@ -991,7 +1003,7 @@ public class WDL
         }
         else
             typeOfObject = object.getClass();
-        
+
         try
         {
             Field f = stealField( typeOfObject, typeOfField );
