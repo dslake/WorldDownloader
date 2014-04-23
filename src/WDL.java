@@ -196,11 +196,11 @@ public class WDL
         if (downloading)
         {
             // Indicate that downloading has stopped
-            downloading = false;
             startOnChange = false;
             chatMsg("Download stopped");
 
             startSaveThread();
+            downloading = false;
         }
     }
 
