@@ -51,9 +51,9 @@ public class GuiIngameMenu extends GuiScreen
             GuiButton wdlOptions = new GuiButton(51, this.width / 2 + 71, this.height / 4 + 72 + var1, 28, 20, "...");
             this.buttonList.add(wdlOptions);
             wdlOptions.enabled = (!WDL.downloading || (WDL.downloading && !WDL.saving));
-            ((GuiButton)this.buttonList.get(0)).field_146129_i = this.height / 4 + 144 + var1;
-            ((GuiButton)this.buttonList.get(2)).field_146129_i = this.height / 4 + 120 + var1;
-            ((GuiButton)this.buttonList.get(3)).field_146129_i = this.height / 4 + 120 + var1;
+            ((GuiButton)this.buttonList.get(0)).yPosition = this.height / 4 + 144 + var1;
+            ((GuiButton)this.buttonList.get(2)).yPosition = this.height / 4 + 120 + var1;
+            ((GuiButton)this.buttonList.get(3)).yPosition = this.height / 4 + 120 + var1;
         }
         /* <<< WDL */
 
@@ -91,11 +91,11 @@ public class GuiIngameMenu extends GuiScreen
                 break;
 
             case 5:
-                this.mc.displayGuiScreen(new GuiAchievements(this, this.mc.thePlayer.func_146107_m()));
+                this.mc.displayGuiScreen(new GuiAchievements(this, this.mc.thePlayer.getStatFileWriter()));
                 break;
 
             case 6:
-                this.mc.displayGuiScreen(new GuiStats(this, this.mc.thePlayer.func_146107_m()));
+                this.mc.displayGuiScreen(new GuiStats(this, this.mc.thePlayer.getStatFileWriter()));
                 break;
 
             case 7:
