@@ -699,25 +699,25 @@ public class NetHandlerPlayClient implements INetHandlerPlayClient
     /**
      * Updates the specified chunk with the supplied data, marks it for re-rendering and lighting recalculation
      */
-    public void handleChunkData(S21PacketChunkData packetChunkData)
+    public void handleChunkData(S21PacketChunkData p_147263_1_)
     {
-        if (packetChunkData.func_149274_i())
+        if (p_147263_1_.func_149274_i())
         {
-            if (packetChunkData.func_149276_g() == 0)
+            if (p_147263_1_.func_149276_g() == 0)
             {
-                this.clientWorldController.doPreChunk(packetChunkData.getChunkX(), packetChunkData.getChunkZ(), false);
+                this.clientWorldController.doPreChunk(p_147263_1_.func_149273_e(), p_147263_1_.func_149271_f(), false);
                 return;
             }
 
-            this.clientWorldController.doPreChunk(packetChunkData.getChunkX(), packetChunkData.getChunkZ(), true);
+            this.clientWorldController.doPreChunk(p_147263_1_.func_149273_e(), p_147263_1_.func_149271_f(), true);
         }
 
-        this.clientWorldController.invalidateBlockReceiveRegion(packetChunkData.getChunkX() << 4, 0, packetChunkData.getChunkZ() << 4, (packetChunkData.getChunkX() << 4) + 15, 256, (packetChunkData.getChunkZ() << 4) + 15);
-        Chunk var2 = this.clientWorldController.getChunkFromChunkCoords(packetChunkData.getChunkX(), packetChunkData.getChunkZ());
-        var2.fillChunk(packetChunkData.func_149272_d(), packetChunkData.func_149276_g(), packetChunkData.func_149270_h(), packetChunkData.func_149274_i());
-        this.clientWorldController.markBlockRangeForRenderUpdate(packetChunkData.getChunkX() << 4, 0, packetChunkData.getChunkZ() << 4, (packetChunkData.getChunkX() << 4) + 15, 256, (packetChunkData.getChunkZ() << 4) + 15);
+        this.clientWorldController.invalidateBlockReceiveRegion(p_147263_1_.func_149273_e() << 4, 0, p_147263_1_.func_149271_f() << 4, (p_147263_1_.func_149273_e() << 4) + 15, 256, (p_147263_1_.func_149271_f() << 4) + 15);
+        Chunk var2 = this.clientWorldController.getChunkFromChunkCoords(p_147263_1_.func_149273_e(), p_147263_1_.func_149271_f());
+        var2.fillChunk(p_147263_1_.func_149272_d(), p_147263_1_.func_149276_g(), p_147263_1_.func_149270_h(), p_147263_1_.func_149274_i());
+        this.clientWorldController.markBlockRangeForRenderUpdate(p_147263_1_.func_149273_e() << 4, 0, p_147263_1_.func_149271_f() << 4, (p_147263_1_.func_149273_e() << 4) + 15, 256, (p_147263_1_.func_149271_f() << 4) + 15);
 
-        if (!packetChunkData.func_149274_i() || !(this.clientWorldController.provider instanceof WorldProviderSurface))
+        if (!p_147263_1_.func_149274_i() || !(this.clientWorldController.provider instanceof WorldProviderSurface))
         {
             var2.resetRelightChecks();
         }
@@ -751,6 +751,7 @@ public class NetHandlerPlayClient implements INetHandlerPlayClient
             }
         }
         /* <<< WDL */
+        
         this.netManager.closeChannel(p_147253_1_.func_149165_c());
     }
 
@@ -826,6 +827,7 @@ public class NetHandlerPlayClient implements INetHandlerPlayClient
         String var2 = p_147251_1_.func_148915_c().getFormattedText();
         WDL.handleServerSeedMessage(var2);
         /* <<< WDL */
+
         this.gameController.ingameGUI.getChatGUI().printChatMessage(p_147251_1_.func_148915_c());
     }
 
