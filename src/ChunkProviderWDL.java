@@ -16,6 +16,7 @@ import net.minecraft.util.LongHashMap;
 import net.minecraft.world.ChunkCoordIntPair;
 import net.minecraft.world.ChunkPosition;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldProviderSurface;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.EmptyChunk;
@@ -56,6 +57,7 @@ public class ChunkProviderWDL implements IChunkProvider{
     int lastPlayerChunkX = 0;
     int lastPlayerChunkZ = 0;
     int deleteRange = 16;
+    private final Object chunkLock = new Object();
 
 	public ChunkProviderWDL(World world) {
         this.blankChunk = new EmptyChunk(world, 0, 0);
@@ -76,11 +78,15 @@ public class ChunkProviderWDL implements IChunkProvider{
         Chunk chunk = this.provideChunk(chunkX, chunkZ);
         if (!chunk.isEmpty()) {
         	chunk.onChunkUnload();
+        	synchronized (chunkLock) {
+        	this.chunkListing.remove(chunk);
+        	}
         }
         this.chunkMappingStandard.remove(ChunkCoordIntPair.chunkXZ2Int(chunkX, chunkZ)); // delete from standard chunk map
-        if (Math.abs(chunkX - lastPlayerChunkX) > deleteRange || Math.abs(chunkZ - lastPlayerChunkZ) > deleteRange) { // also out of our render range, delete from our distance based chunk map too 
+        if (Math.abs(chunkX - lastPlayerChunkX) > deleteRange || Math.abs(chunkZ - lastPlayerChunkZ) > deleteRange) { // also out of our render range, delete from our distance based chunk map too
+        	synchronized (chunkLock) {
         	this.chunkMapping.remove(ChunkCoordIntPair.chunkXZ2Int(chunkX, chunkZ));
-        	this.chunkListing.remove(chunk);
+        	}
         }
         
 	}
@@ -95,17 +101,20 @@ public class ChunkProviderWDL implements IChunkProvider{
         }
 
         if (chunkStandard == null) { // remove from our distance based mapping if it isn't in the standard mapping
+        	synchronized (chunkLock) {
         	this.chunkMapping.remove(ChunkCoordIntPair.chunkXZ2Int(chunkX, chunkZ));
-        	this.chunkListing.remove(chunk);
+        	}
         }
 	}
 
 	@Override
 	public Chunk loadChunk(int chunkX, int chunkZ) {
         Chunk chunk = new Chunk(this.worldObj, chunkX, chunkZ);
+        synchronized (chunkLock) {
         this.chunkMappingStandard.add(ChunkCoordIntPair.chunkXZ2Int(chunkX, chunkZ), chunk);
         this.chunkMapping.add(ChunkCoordIntPair.chunkXZ2Int(chunkX, chunkZ), chunk);
         this.chunkListing.add(chunk);
+        }
         chunk.isChunkLoaded = true;
 		return chunk;
 	}
@@ -125,10 +134,14 @@ public class ChunkProviderWDL implements IChunkProvider{
 				try {
 					chunk = chunkloader.loadChunk(worldObj, chunkX, chunkZ); // load chunk from storage
 					if (chunk != null) {
+						synchronized (chunkLock) {
 						this.chunkMapping.add(ChunkCoordIntPair.chunkXZ2Int(chunkX, chunkZ), chunk);
-						this.chunkListing.add(chunk);
+						}
 						chunk.isChunkLoaded = true;
 				        this.worldObj.markBlockRangeForRenderUpdate(chunkX << 4, 0, chunkX << 4, (chunkX << 4) + 15, 256, (chunkZ << 4) + 15);
+			            if (!(this.worldObj.provider instanceof WorldProviderSurface)) {
+			                chunk.resetRelightChecks();
+			            }
 					}
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -140,8 +153,10 @@ public class ChunkProviderWDL implements IChunkProvider{
 	
 	@Override
 	public Chunk provideChunk(int chunkX, int chunkZ) {
+		synchronized (chunkLock) {
         Chunk var3 = (Chunk)this.chunkMapping.getValueByKey(ChunkCoordIntPair.chunkXZ2Int(chunkX, chunkZ));
-        return var3 == null ? this.blankChunk : var3;	
+        return var3 == null ? this.blankChunk : var3;
+		}
     }
 
 	/**
@@ -174,12 +189,18 @@ public class ChunkProviderWDL implements IChunkProvider{
     		int offsetZ = Math.abs(playerChunkZ - lastPlayerChunkZ);
     		lastPlayerChunkX = playerChunkX;
     		lastPlayerChunkZ = playerChunkZ;
-    		int range = this.mc.gameSettings.renderDistanceChunks;
-    		for (int t = lastPlayerChunkX - range; t <= lastPlayerChunkX + range; t++) {
-    			for (int s = lastPlayerChunkZ - range; s <= lastPlayerChunkZ + range; s++) {
-    				this.loadStoredChunk(t, s);
+    		final int range = this.mc.gameSettings.renderDistanceChunks;
+    		final long startTime = System.nanoTime();
+    		new Thread(new Runnable() { // load in a thread so we aren't blocking, particularly for giant texture packs
+    			public void run() {
+    				for (int t = lastPlayerChunkX - range; t <= lastPlayerChunkX + range; t++) {
+    					for (int s = lastPlayerChunkZ - range; s <= lastPlayerChunkZ + range; s++) {
+    						loadStoredChunk(t, s);
+    					}
+    				}
     			}
-    		}
+    		}, "WDL Load Stored Chunks Thread").start();
+    		System.out.println(System.nanoTime()-startTime);
     		
     		for (int t = lastPlayerChunkX - deleteRange - offsetX; t <= lastPlayerChunkX + deleteRange + offsetX; t++) {
     			for (int s = 1; s <= offsetZ; s++) {
@@ -196,12 +217,14 @@ public class ChunkProviderWDL implements IChunkProvider{
     	}
 
         long var1 = System.currentTimeMillis();
+        synchronized (chunkLock) {
         Iterator var3 = this.chunkListing.iterator();
 
         while (var3.hasNext())
         {
             Chunk var4 = (Chunk)var3.next();
             var4.func_150804_b(System.currentTimeMillis() - var1 > 5L);
+        }
         }
 
         if (System.currentTimeMillis() - var1 > 100L)
@@ -233,7 +256,9 @@ public class ChunkProviderWDL implements IChunkProvider{
 	@Override
     public String makeString()
     {
+		synchronized (chunkLock) {
         return "MultiplayerChunkCache: " + this.chunkMapping.getNumHashElements() + ", " + this.chunkListing.size();
+		}
     }
 
     /**
