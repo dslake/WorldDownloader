@@ -196,11 +196,11 @@ public class WDL
         if (downloading)
         {
             // Indicate that downloading has stopped
-            downloading = false;
             startOnChange = false;
             chatMsg("Download stopped");
 
             startSaveThread();
+            downloading = false;
         }
     }
 
@@ -465,7 +465,7 @@ public class WDL
         if (block == Blocks.noteblock)
         {
             TileEntityNote newTE = new TileEntityNote();
-            newTE.field_145879_a = (byte)(param % 25);
+            newTE.note = (byte)(param % 25);
             wc.setTileEntity(x, y, z, newTE);
             newTileEntities.add(new ChunkPosition(x, y, z));
             chatDebug("onBlockEvent: Note Block: " + x + " " + y + " " + z + " pitch: " + param + " - " + newTE);
@@ -496,19 +496,19 @@ public class WDL
                     String entityType = null;
                     if ((entityType = isImportableTileEntity(te)) != null)
                     {
-                        if (!newTileEntities.contains(new ChunkPosition(te.field_145851_c, te.field_145848_d, te.field_145849_e)))
+                        if (!newTileEntities.contains(new ChunkPosition(te.xCoord, te.yCoord, te.zCoord)))
                         {
-                            wc.setTileEntity(te.field_145851_c, te.field_145848_d, te.field_145849_e, te);
-                            chatDebug("Loaded TE: " + entityType + " at " + te.field_145851_c + " " + te.field_145848_d + " " + te.field_145849_e);
+                            wc.setTileEntity(te.xCoord, te.yCoord, te.zCoord, te);
+                            chatDebug("Loaded TE: " + entityType + " at " + te.xCoord + " " + te.yCoord + " " + te.zCoord);
                         }
                         else
                         {
-                            chatDebug("Dropping old TE: " + entityType + " at " + te.field_145851_c + " " + te.field_145848_d + " " + te.field_145849_e);
+                            chatDebug("Dropping old TE: " + entityType + " at " + te.xCoord + " " + te.yCoord + " " + te.zCoord);
                         }
                     }
                     else
                     {
-                        chatDebug("Old TE is not importable: " + entityType + " at " + te.field_145851_c + " " + te.field_145848_d + " " + te.field_145849_e);
+                        chatDebug("Old TE is not importable: " + entityType + " at " + te.xCoord + " " + te.yCoord + " " + te.zCoord);
                     }
                 }
             }
@@ -521,7 +521,7 @@ public class WDL
     /** Checks if the TileEntity should be imported. Only "problematic" TEs will be imported. */
     public static String isImportableTileEntity(TileEntity te)
     {
-        Block block = wc.getBlock(te.field_145851_c, te.field_145848_d, te.field_145849_e);
+        Block block = wc.getBlock(te.xCoord, te.yCoord, te.zCoord);
         if (block instanceof BlockChest && te instanceof TileEntityChest)
         {
             return "TileEntityChest";
@@ -666,7 +666,7 @@ public class WDL
     {
         chatDebug("Saving chunks...");
         // Get the ChunkProviderClient from WorldClient
-        ChunkProviderClient chunkProvider = (ChunkProviderClient)wc.getChunkProvider();
+        ChunkProviderWDL chunkProvider = (ChunkProviderWDL)wc.getChunkProvider();
 
         // Get the hashArray field and set it accessible
         Field hashArrayField = null;
@@ -1074,9 +1074,9 @@ public class WDL
     {
         try
         {
-            if (mc.func_147104_D() != null) // getServerData
+            if (mc.getCurrentServerData() != null) // getCurrentServerData
             {
-                return mc.func_147104_D().serverName;
+                return mc.getCurrentServerData().serverName;
             }
             else if (mcos != null)
             {
@@ -1128,7 +1128,7 @@ public class WDL
     public static void chatMsg(String msg)
     {
         // System.out.println( "WorldDownloader: " + msg ); // Just for debugging!
-        mc.ingameGUI.getChatGUI().func_146227_a(new ChatComponentText("\u00A7c[WorldDL]\u00A76 " + msg));
+        mc.ingameGUI.getChatGUI().printChatMessage(new ChatComponentText("\u00A7c[WorldDL]\u00A76 " + msg));
     }
 
     /** Adds a chat message with a World Downloader prefix */
@@ -1137,14 +1137,14 @@ public class WDL
         if (!WDL.DEBUG)
             return;
         // System.out.println( "WorldDownloader: " + msg ); // Just for debugging!
-        mc.ingameGUI.getChatGUI().func_146227_a(new ChatComponentText("\u00A72[WorldDL]\u00A76 " + msg));
+        mc.ingameGUI.getChatGUI().printChatMessage(new ChatComponentText("\u00A72[WorldDL]\u00A76 " + msg));
     }
     
     /** Adds a chat message with a World Downloader prefix */
     public static void chatError(String msg)
     {
         // System.out.println( "WorldDownloader: " + msg ); // Just for debugging!
-        mc.ingameGUI.getChatGUI().func_146227_a(new ChatComponentText("\u00A72[WorldDL]\u00A74 " + msg));
+        mc.ingameGUI.getChatGUI().printChatMessage(new ChatComponentText("\u00A72[WorldDL]\u00A74 " + msg));
     }
 
     

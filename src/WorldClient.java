@@ -49,6 +49,7 @@ import net.minecraft.entity.passive.IAnimals;
 import net.minecraft.entity.projectile.EntityEgg;
 import net.minecraft.entity.projectile.EntityFishHook;
 import net.minecraft.entity.projectile.EntityPotion;
+import net.minecraft.wdl.ChunkProviderWDL;
 import net.minecraft.wdl.WDL;
 import net.minecraft.world.IWorldAccess;
 /* <<< WDL */
@@ -60,7 +61,10 @@ public class WorldClient extends World
     private NetHandlerPlayClient sendQueue;
 
     /** The ChunkProviderClient instance */
-    private ChunkProviderClient clientChunkProvider;
+    /* WDL >>> */
+    //private ChunkProviderClient clientChunkProvider
+    private ChunkProviderWDL clientChunkProvider;
+    /* <<< WDL */
 
     /**
      * The hash set of entities handled by this client. Uses the entity's ID as the hash set's key.
@@ -153,7 +157,7 @@ public class WorldClient extends World
      */
     protected IChunkProvider createChunkProvider()
     {
-        this.clientChunkProvider = new ChunkProviderClient(this);
+        this.clientChunkProvider = new ChunkProviderWDL(this);
         return this.clientChunkProvider;
     }
 
@@ -277,7 +281,7 @@ public class WorldClient extends World
             }
         }
 
-        if (RenderManager.instance.getEntityRenderObject(par1Entity).func_147905_a() && !var2)
+        if (RenderManager.instance.getEntityRenderObject(par1Entity).isStaticEntity() && !var2)
         {
             this.mc.renderGlobal.onStaticEntitiesChanged();
         }
@@ -305,7 +309,7 @@ public class WorldClient extends World
 
         this.entityHashSet.addKey(par1, par2Entity);
 
-        if (RenderManager.instance.getEntityRenderObject(par2Entity).func_147905_a())
+        if (RenderManager.instance.getEntityRenderObject(par2Entity).isStaticEntity())
         {
             this.mc.renderGlobal.onStaticEntitiesChanged();
         }
@@ -592,9 +596,9 @@ public class WorldClient extends World
     }
 
     @Override
-    public void func_147452_c(int par1, int par2, int par3, Block par4, int par5, int par6)
+    public void addBlockEvent(int par1, int par2, int par3, Block par4, int par5, int par6)
     {
-        super.func_147452_c(par1, par2, par3, par4, par5, par6);
+        super.addBlockEvent(par1, par2, par3, par4, par5, par6);
         if( WDL.downloading )
             WDL.onBlockEvent( par1, par2, par3, par4, par5, par6 );
     }
