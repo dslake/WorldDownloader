@@ -1,0 +1,11 @@
+{
+    "name": "WorldDownloader",
+    "mcversion": "1.7.10",
+    "version": "1.0.0",
+    "revision": "1000",
+    "author": "nairol, cubic72. MamiyaOtaru",
+    "description": "Download bits of multiplayer worlds you visit and save them for later use in singleplayer.",
+    "classTransformerClasses" : [
+        "wdl.litemod.WDLTransformer"
+    ]
+}

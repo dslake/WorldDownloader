@@ -8,9 +8,11 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import com.mojang.realmsclient.RealmsMainScreen;
 import com.mojang.realmsclient.dto.McoServer;
@@ -111,6 +113,8 @@ public class WDL
 
     // Positions of newly created TileEntities that will overwrite the imported ones when saving:
     public static HashSet<ChunkPosition> newTileEntities = new HashSet<ChunkPosition>();
+    
+    public static Set<Chunk> changedChunks = Collections.synchronizedSet(new HashSet<Chunk>());
 
     // State variables:
     public static boolean downloading = false; // Read-only outside of this class!
@@ -129,6 +133,8 @@ public class WDL
     public static Properties baseProps;
     public static Properties worldProps;
     public static Properties defaultProps;
+    
+    public static ChunkChangeObserver observer;
 
     // Initialization:
     static
@@ -161,6 +167,8 @@ public class WDL
 
         baseProps = new Properties(defaultProps);
         worldProps = new Properties(baseProps);
+        
+        observer = new ChunkChangeObserver();
     }
 
     /** Starts the download */
@@ -246,6 +254,7 @@ public class WDL
 
     public static void loadWorld()
     {
+    	changedChunks.clear();
         worldName = ""; // The new (multi-)world name is unknown at the moment
         wc = mc.theWorld;
         tp = mc.thePlayer;
@@ -299,7 +308,7 @@ public class WDL
     /** Must be called when a chunk is no longer needed and should be removed */
     public static void onChunkNoLongerNeeded(Chunk unneededChunk)
     {
-        if (unneededChunk == null || unneededChunk.isModified == false)
+        if (unneededChunk == null || (unneededChunk.isModified == false && !changedChunks.remove(unneededChunk)))
             return;
 
         chatDebug("onChunkNoLongerNeeded: " + unneededChunk.xPosition + ", " + unneededChunk.zPosition);
@@ -380,28 +389,28 @@ public class WDL
                 ChunkPosition cp2;
                 TileEntityChest tec1, tec2;
                 if ((te2 = wc.getTileEntity(lastX, lastY, lastZ + 1)) instanceof TileEntityChest &&
-                        ((TileEntityChest)te2).func_145980_j() == ((TileEntityChest)te).func_145980_j())
+                        ((TileEntityChest)te2).getChestType() == ((TileEntityChest)te).getChestType())
                 {
                     tec1 = (TileEntityChest)te;
                     tec2 = (TileEntityChest)te2;
                     cp2 = new ChunkPosition(lastX, lastY, lastZ + 1);
                 }
                 else if ((te2 = wc.getTileEntity(lastX, lastY, lastZ - 1)) instanceof TileEntityChest &&
-                        ((TileEntityChest)te2).func_145980_j() == ((TileEntityChest)te).func_145980_j())
+                        ((TileEntityChest)te2).getChestType() == ((TileEntityChest)te).getChestType())
                 {
                     tec1 = (TileEntityChest)te2;
                     tec2 = (TileEntityChest)te;
                     cp2 = new ChunkPosition(lastX, lastY, lastZ - 1);
                 }
                 else if ((te2 = wc.getTileEntity(lastX + 1, lastY, lastZ)) instanceof TileEntityChest &&
-                        ((TileEntityChest)te2).func_145980_j() == ((TileEntityChest)te).func_145980_j())
+                        ((TileEntityChest)te2).getChestType() == ((TileEntityChest)te).getChestType())
                 {
                     tec1 = (TileEntityChest)te;
                     tec2 = (TileEntityChest)te2;
                     cp2 = new ChunkPosition(lastX + 1, lastY, lastZ);
                 }
                 else if ((te2 = wc.getTileEntity(lastX - 1, lastY, lastZ)) instanceof TileEntityChest &&
-                        ((TileEntityChest)te2).func_145980_j() == ((TileEntityChest)te).func_145980_j())
+                        ((TileEntityChest)te2).getChestType() == ((TileEntityChest)te).getChestType())
                 {
                     tec1 = (TileEntityChest)te2;
                     tec2 = (TileEntityChest)te;
@@ -806,7 +815,7 @@ public class WDL
                 {
                     // Chunk c = (Chunk)lhme.getValue();
                     Chunk c = (Chunk)valueField.get(lhme);
-                    if (c != null && c.isModified)
+                    if (c != null && (c.isModified || changedChunks.remove(c)))
                     {
                         saveChunk(c);
 
@@ -1135,14 +1144,14 @@ public class WDL
     {
         try
         {
-            if (mc.func_147104_D() != null) // getServerData
+            if (mc.getCurrentServerData() != null) // getCurrentServerData
             {
-                String name = mc.func_147104_D().serverName;
+                String name = mc.getCurrentServerData().serverName;
                 
                 if(name.equals(I18n.format("selectServer.defaultName")))
                 {
                 	// Direct connection using domain name or IP (and port)
-                	name =  mc.func_147104_D().serverIP;
+                	name =  mc.getCurrentServerData().serverIP;
                 }
                 return name;
             }
@@ -1447,4 +1456,10 @@ public class WDL
             WDL.stop();
         }
     }
+    
+	public static void chunkChanged(Chunk chunk) { 
+   		changedChunks.add(chunk);
+	}
+	
+	
 }
